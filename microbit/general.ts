@@ -179,8 +179,8 @@ function parseChart(input: string): Chart {
             continue
         }
 
-        if (dt.indexOf("WD") === 0) {
-            let numPart = dt.slice(2);
+        if (dt.indexOf("W") === 0) {
+            let numPart = dt.slice(1);
             let bracketIndex = numPart.indexOf("(");
             if (bracketIndex !== -1) {
                 numPart = numPart.slice(0, bracketIndex);
