@@ -93,6 +93,17 @@ android {
             keyPassword 'android'
         }
     }
+    packagingOptions {
+        pickFirst 'META-INF/proguard/androidx-*.pro'
+        pickFirst 'META-INF/androidx.*.version'
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/INDEX.LIST'
+        exclude 'META-INF/MANIFEST.MF'
+    }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -104,6 +115,12 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+tasks.whenTaskAdded { task ->
+    if (task.name == 'mergeDebugJavaResource' || task.name == 'mergeReleaseJavaResource') {
+        task.enabled = false
     }
 }
 
