@@ -1,53 +1,62 @@
-import { RoomSchedule, WEEK_DAYS } from '../types/timetable';
+import { EventWindow, RoomSchedule, WEEK_DAYS } from '../types/timetable';
 
 /**
- * Wire format sent to the microbits over UDP broadcast, one packet per room.
- * Every microbit receives every packet and ignores ones that don't start
- * with its own room code.
+ * Wire format sent to the microbits over UDP broadcast, one packet per room
+ * (protocol v2 — see docs/superpowers/specs/2026-09-18-course-timetable-compiler-design.md
+ * and microbit/general.ts / microbit/ungeneral.ts, which this must match exactly):
  *
- *   <RoomCode>|WD1|<start>-<end>|<start>-<end>|WD2|...|WD7|...|E1|<date>|<start>-<end>Y|<start>-<end>N|...|T|<chatId>|<chatId>|...
+ *   <RoomCode>|[WD<n>|<slot>...]*|E|<date>|<slot>...|H|<range>...|T|<chatId>...
  *
- * Every room gets the weekly WD1-WD7 section — every room has aircon.
- * `special` vs `general` (src/types/timetable.ts) only decides which rows
- * of the Excel Timetable sheet a room's schedule is resolved from
- * (buildRoomSchedules() in src/excel/excelParser.ts); it has no effect on
- * the packet shape.
- *
- * The WD<n>/E<id>/T tokens are section markers: a day or event section with
- * no windows is just the bare marker followed immediately by the next
- * marker. The T section (and its trailing chat ids) is omitted entirely
- * when the room has no trackers.
- *
- * This must match the microbit firmware's parseChart() token grammar
- * exactly: it detects a weekday marker via `token.indexOf("WD") === 0`
- * (not "W"), an event marker via `token.indexOf("E") === 0`, and a time
- * slot via exact length 9 (`HHMM-HHMM`) or 10 (`HHMM-HHMM` + `Y`/`N`).
- * The firmware currently ignores the per-event `<date>` token entirely
- * (it fails the length-9/10 check and is silently skipped) — see the
- * "event date filtering" note in docs/TIMETABLE_FORMAT.md.
+ * - `special` rooms always get all 7 WD markers (bare if that day has no
+ *   windows) — their weekly section is an explicit, additive "on" schedule.
+ * - `general` rooms only get a WD<n> marker for a day with at least one
+ *   override window; other days are omitted entirely, and the firmware
+ *   falls back to its own hardcoded default hours for them.
+ * - A weekly slot omits its Y/N flag when enabled (bare = on); an event
+ *   slot always carries an explicit flag.
+ * - "E", "H", "T" are bare section markers, each omitted entirely when the
+ *   room has nothing to say for that section.
  */
 
 const FIELD_SEP = '|';
 
-function timeRange(start: string, end: string): string {
-  return `${start}-${end}`;
+function encodeWeeklySlot(w: EventWindow): string {
+  return w.enabled ? `${w.start}-${w.end}` : `${w.start}-${w.end}N`;
+}
+
+function encodeEventSlot(w: EventWindow): string {
+  return `${w.start}-${w.end}${w.enabled ? 'Y' : 'N'}`;
 }
 
 export function buildRoomPacket(schedule: RoomSchedule): string {
   const parts: string[] = [schedule.room.code];
+  const isSpecial = schedule.room.type === 'special';
 
   for (const day of WEEK_DAYS) {
+    const slots = schedule.weekly[day];
+    if (!isSpecial && slots.length === 0) {
+      continue;
+    }
     parts.push(`WD${day}`);
-    for (const range of schedule.weekly[day]) {
-      parts.push(timeRange(range.start, range.end));
+    for (const slot of slots) {
+      parts.push(encodeWeeklySlot(slot));
     }
   }
 
-  for (const event of schedule.events) {
-    parts.push(event.eventId);
-    parts.push(event.date);
-    for (const window of event.windows) {
-      parts.push(`${timeRange(window.start, window.end)}${window.enabled ? 'Y' : 'N'}`);
+  if (schedule.events.length > 0) {
+    parts.push('E');
+    for (const day of schedule.events) {
+      parts.push(day.date);
+      for (const window of day.windows) {
+        parts.push(encodeEventSlot(window));
+      }
+    }
+  }
+
+  if (schedule.holidays.length > 0) {
+    parts.push('H');
+    for (const holiday of schedule.holidays) {
+      parts.push(`${holiday.start}-${holiday.end}`);
     }
   }
 

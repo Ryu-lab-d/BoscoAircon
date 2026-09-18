@@ -9,15 +9,14 @@ export function toDateCode(date: Date): string {
 }
 
 /**
- * The microbit firmware ignores the packet's `<date>` token entirely — it
- * fails `parseTimeSlot()`'s length-9/10 check and is silently skipped (see
- * docs/TIMETABLE_FORMAT.md). Left unfiltered, a one-off event's windows
- * would be treated as active every day forever, purely by time-of-day.
- *
- * Callers must run resolved schedules through this before building/sending
- * packets, so only events actually relevant on `dateCode` (default: today)
- * go out. It does not affect what's shown for review/planning — filter
- * only at the point of broadcast.
+ * Protocol v2's firmware does its own date matching (see microbit/general.ts
+ * / ungeneral.ts), so this is no longer needed for correctness — but a
+ * SpecialEvents import can span a whole term's worth of dates, and there's
+ * no reason to broadcast (and have every microbit hold in memory) event
+ * windows for dates other than today. Callers should still run resolved
+ * schedules through this before building/sending packets; it does not
+ * affect what's shown for review/planning — filter only at the point of
+ * broadcast.
  */
 export function filterSchedulesForDate(
   schedules: RoomSchedule[],

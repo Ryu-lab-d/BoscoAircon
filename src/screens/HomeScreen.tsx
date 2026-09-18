@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,11 +9,18 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { buildRoomSchedules, parseTimetableWorkbookFromBase64, TimetableParseError } from '../excel/excelParser';
+import type { WorkBook } from 'xlsx';
+import { compileSchedules } from '../excel/compiler';
+import { parseHolidays } from '../excel/holidays';
+import { parseSpecialEvents } from '../excel/specialEvents';
+import { parseRoomMappingRules, TimetableWarning } from '../excel/timetableCompiler';
+import { parseTrackers } from '../excel/trackers';
+import { readWorkbookFromBase64 } from '../excel/xlsxUtil';
 import { pickWorkbook } from '../excel/pickWorkbook';
 import { filterSchedulesForDate } from '../udp/eventFilter';
 import { broadcastSchedules, TimetableBroadcaster } from '../udp/udpSender';
-import type { RoomSchedule } from '../types/timetable';
+import type { Holiday, RoomMappingRule, RoomSchedule, SpecialEventRow, Tracker, WeekDay, EventWindow } from '../types/timetable';
+import RoomCard, { RoomStatus, weekdaySummary } from './RoomCard';
 
 const DEFAULT_PORT = '9000';
 const DEFAULT_ADDRESS = '255.255.255.255';
@@ -21,51 +28,139 @@ const DEFAULT_ADDRESS = '255.255.255.255';
 // broadcasting to many rooms at once — see BroadcastOptions.interPacketDelayMs.
 const SEND_ALL_DELAY_MS = 150;
 
-type RoomStatus = { text: string; ok: boolean } | null;
 
-function weekdaySummary(schedule: RoomSchedule): string {
-  const days = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
-  const active = ([1, 2, 3, 4, 5, 6, 7] as const)
-    .filter(d => schedule.weekly[d].length > 0)
-    .map(d => days[d - 1]);
-  return active.length > 0 ? active.join(' ') : 'ไม่มีช่วงเปิดแอร์สัปดาห์นี้';
+interface ImportRowProps {
+  label: string;
+  required?: boolean;
+  fileName: string | null;
+  count?: number;
+  onPress: () => void;
+  loading: boolean;
+}
+
+function ImportRow({ label, required, fileName, count, onPress, loading }: ImportRowProps) {
+  return (
+    <View style={styles.importRow}>
+      <View style={styles.importInfo}>
+        <Text style={styles.importLabel}>
+          {label}
+          {required ? ' *' : ''}
+        </Text>
+        <Text style={styles.importFileName} numberOfLines={1}>
+          {fileName ? `${fileName}${count !== undefined ? ` (${count})` : ''}` : 'ยังไม่ได้เลือก'}
+        </Text>
+      </View>
+      <Pressable style={styles.importButton} onPress={onPress} disabled={loading}>
+        <Text style={styles.importButtonText}>เลือกไฟล์</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 export default function HomeScreen() {
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [timetableWb, setTimetableWb] = useState<WorkBook | null>(null);
+  const [timetableName, setTimetableName] = useState<string | null>(null);
+
+  const [roomMappingRules, setRoomMappingRules] = useState<RoomMappingRule[]>([]);
+  const [roomMappingName, setRoomMappingName] = useState<string | null>(null);
+
+  const [specialEvents, setSpecialEvents] = useState<SpecialEventRow[]>([]);
+  const [specialEventsName, setSpecialEventsName] = useState<string | null>(null);
+
+  const [trackers, setTrackers] = useState<Tracker[]>([]);
+  const [trackersName, setTrackersName] = useState<string | null>(null);
+
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [holidaysName, setHolidaysName] = useState<string | null>(null);
+
   const [schedules, setSchedules] = useState<RoomSchedule[]>([]);
+  const [warnings, setWarnings] = useState<TimetableWarning[]>([]);
   const [loading, setLoading] = useState(false);
+  const [compiling, setCompiling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [port, setPort] = useState(DEFAULT_PORT);
   const [address, setAddress] = useState(DEFAULT_ADDRESS);
   const [roomStatus, setRoomStatus] = useState<Record<string, RoomStatus>>({});
   const [sendingAll, setSendingAll] = useState(false);
 
-  const handlePickFile = useCallback(async () => {
+  const pickAndParse = useCallback(async <T,>(onParsed: (workbook: WorkBook, name: string) => T): Promise<T | null> => {
     setError(null);
     setLoading(true);
     try {
       const picked = await pickWorkbook();
       if (!picked) {
-        return; // user cancelled
+        return null; // user cancelled
       }
-      const parsed = parseTimetableWorkbookFromBase64(picked.base64);
-      const resolved = buildRoomSchedules(parsed);
-      setFileName(picked.name);
-      setSchedules(resolved);
-      setRoomStatus({});
+      const workbook = readWorkbookFromBase64(picked.base64);
+      return onParsed(workbook, picked.name);
     } catch (err) {
-      const message =
-        err instanceof TimetableParseError
-          ? err.message
-          : `อ่านไฟล์ไม่สำเร็จ: ${(err as Error).message}`;
-      setError(message);
-      setSchedules([]);
-      setFileName(null);
+      setError(`อ่านไฟล์ไม่สำเร็จ: ${(err as Error).message}`);
+      return null;
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handlePickTimetable = useCallback(() => {
+    pickAndParse((wb, name) => {
+      setTimetableWb(wb);
+      setTimetableName(name);
+      setSchedules([]);
+      setWarnings([]);
+    });
+  }, [pickAndParse]);
+
+  const handlePickRoomMappingRules = useCallback(() => {
+    pickAndParse((wb, name) => {
+      setRoomMappingRules(parseRoomMappingRules(wb));
+      setRoomMappingName(name);
+    });
+  }, [pickAndParse]);
+
+  const handlePickSpecialEvents = useCallback(() => {
+    pickAndParse((wb, name) => {
+      setSpecialEvents(parseSpecialEvents(wb));
+      setSpecialEventsName(name);
+    });
+  }, [pickAndParse]);
+
+  const handlePickTrackers = useCallback(() => {
+    pickAndParse((wb, name) => {
+      setTrackers(parseTrackers(wb));
+      setTrackersName(name);
+    });
+  }, [pickAndParse]);
+
+  const handlePickHolidays = useCallback(() => {
+    pickAndParse((wb, name) => {
+      setHolidays(parseHolidays(wb));
+      setHolidaysName(name);
+    });
+  }, [pickAndParse]);
+
+  const handleCompile = useCallback(() => {
+    if (!timetableWb) {
+      return;
+    }
+    setError(null);
+    setCompiling(true);
+    try {
+      const result = compileSchedules({
+        timetable: timetableWb,
+        roomMappingRules,
+        specialEvents,
+        trackers,
+        holidays,
+      });
+      setSchedules(result.schedules);
+      setWarnings(result.warnings);
+      setRoomStatus({});
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCompiling(false);
+    }
+  }, [timetableWb, roomMappingRules, specialEvents, trackers, holidays]);
 
   const parsedPort = useCallback(() => {
     const value = Number(port);
@@ -82,8 +177,6 @@ export default function HomeScreen() {
         setRoomStatus(prev => ({ ...prev, [schedule.room.code]: { text: 'กำลังส่ง…', ok: true } }));
         const broadcaster = new TimetableBroadcaster({ port: parsedPort(), address: addr });
         try {
-          // Only today's events go out — the microbit ignores the packet's
-          // date token, so anything else would look "active" forever.
           const [todaySchedule] = filterSchedulesForDate([schedule]);
           await broadcaster.sendSchedule(todaySchedule);
           setRoomStatus(prev => ({
@@ -168,87 +261,150 @@ export default function HomeScreen() {
     );
   }, [address, port, parsedPort, schedules]);
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>BoscoAircon</Text>
-      <Text style={styles.subtitle}>
-        {fileName ? `ไฟล์: ${fileName} (${schedules.length} ห้อง)` : 'ยังไม่ได้เลือกไฟล์ Excel'}
-      </Text>
+  const canCompile = timetableWb !== null && !loading && !compiling;
 
-      <Pressable style={styles.primaryButton} onPress={handlePickFile} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.primaryButtonText}>เลือกไฟล์ Excel</Text>
-        )}
-      </Pressable>
+  const listHeader = useMemo(
+    () => (
+      <View>
+        <Text style={styles.title}>BoscoAircon</Text>
+        <Text style={styles.subtitle}>นำเข้าตารางเรียนจริงแล้วคอมไพล์เป็นตารางเปิด-ปิดแอร์รายห้อง</Text>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+        <ImportRow
+          label="ตารางเรียน (Timetable)"
+          required
+          fileName={timetableName}
+          onPress={handlePickTimetable}
+          loading={loading}
+        />
+        <ImportRow
+          label="กติกาห้องพิเศษ (RoomMappingRules)"
+          fileName={roomMappingName}
+          count={roomMappingName ? roomMappingRules.length : undefined}
+          onPress={handlePickRoomMappingRules}
+          loading={loading}
+        />
+        <ImportRow
+          label="กิจกรรมพิเศษ (SpecialEvents)"
+          fileName={specialEventsName}
+          count={specialEventsName ? specialEvents.length : undefined}
+          onPress={handlePickSpecialEvents}
+          loading={loading}
+        />
+        <ImportRow
+          label="ผู้รับแจ้งเตือน (Trackers)"
+          fileName={trackersName}
+          count={trackersName ? trackers.length : undefined}
+          onPress={handlePickTrackers}
+          loading={loading}
+        />
+        <ImportRow
+          label="วันหยุด (Holidays)"
+          fileName={holidaysName}
+          count={holidaysName ? holidays.length : undefined}
+          onPress={handlePickHolidays}
+          loading={loading}
+        />
 
-      <View style={styles.settingsRow}>
-        <View style={styles.settingsField}>
-          <Text style={styles.label}>พอร์ต UDP</Text>
-          <TextInput
-            style={styles.input}
-            value={port}
-            onChangeText={setPort}
-            keyboardType="number-pad"
-          />
-        </View>
-        <View style={styles.settingsField}>
-          <Text style={styles.label}>ที่อยู่ Broadcast</Text>
-          <TextInput style={styles.input} value={address} onChangeText={setAddress} autoCapitalize="none" />
-        </View>
-      </View>
-
-      {schedules.length > 0 && (
         <Pressable
-          style={[styles.primaryButton, styles.sendAllButton]}
-          onPress={sendAll}
-          disabled={sendingAll}
+          style={[styles.primaryButton, !canCompile && styles.disabledButton]}
+          onPress={handleCompile}
+          disabled={!canCompile}
         >
-          {sendingAll ? (
+          {compiling ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.primaryButtonText}>ส่งสัญญาณทุกห้อง ({schedules.length})</Text>
+            <Text style={styles.primaryButtonText}>คอมไพล์ตาราง</Text>
           )}
         </Pressable>
-      )}
 
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        {warnings.length > 0 && (
+          <View style={styles.warningBox}>
+            <Text style={styles.warningTitle}>ข้ามบางแถวในตารางเรียน ({warnings.length})</Text>
+            {warnings.slice(0, 5).map((w, i) => (
+              <Text key={i} style={styles.warningText}>
+                แถว {w.row}: {w.message}
+              </Text>
+            ))}
+            {warnings.length > 5 && <Text style={styles.warningText}>...และอีก {warnings.length - 5} รายการ</Text>}
+          </View>
+        )}
+
+        <View style={styles.settingsRow}>
+          <View style={styles.settingsField}>
+            <Text style={styles.label}>พอร์ต UDP</Text>
+            <TextInput style={styles.input} value={port} onChangeText={setPort} keyboardType="number-pad" />
+          </View>
+          <View style={styles.settingsField}>
+            <Text style={styles.label}>ที่อยู่ Broadcast</Text>
+            <TextInput style={styles.input} value={address} onChangeText={setAddress} autoCapitalize="none" />
+          </View>
+        </View>
+
+        {schedules.length > 0 && (
+          <Pressable style={[styles.primaryButton, styles.sendAllButton]} onPress={sendAll} disabled={sendingAll}>
+            {sendingAll ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>ส่งสัญญาณทุกห้อง ({schedules.length})</Text>
+            )}
+          </Pressable>
+        )}
+      </View>
+    ),
+    [
+      timetableName,
+      roomMappingName,
+      roomMappingRules.length,
+      specialEventsName,
+      specialEvents.length,
+      trackersName,
+      trackers.length,
+      holidaysName,
+      holidays.length,
+      loading,
+      compiling,
+      canCompile,
+      error,
+      warnings,
+      port,
+      address,
+      schedules.length,
+      sendingAll,
+      handlePickTimetable,
+      handlePickRoomMappingRules,
+      handlePickSpecialEvents,
+      handlePickTrackers,
+      handlePickHolidays,
+      handleCompile,
+      sendAll,
+    ],
+  );
+
+  return (
+    <View style={styles.container}>
       <FlatList
         style={styles.list}
         data={schedules}
         keyExtractor={item => item.room.code}
+        ListHeaderComponent={listHeader}
         renderItem={({ item }) => {
           const status = roomStatus[item.room.code];
           return (
-            <View style={styles.roomCard}>
-              <View style={styles.roomHeader}>
-                <Text style={styles.roomCode}>{item.room.code}</Text>
-                <View style={[styles.badge, item.room.type === 'special' ? styles.badgeSpecial : styles.badgeGeneral]}>
-                  <Text style={styles.badgeText}>
-                    {item.room.type === 'special' ? 'ตารางเฉพาะ' : 'ตารางมาตรฐาน'}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.roomMeta}>
-                {[item.room.category, item.room.location].filter(Boolean).join(' · ')}
-              </Text>
-              <Text style={styles.roomWeek}>เปิดแอร์: {weekdaySummary(item)}</Text>
-              {item.events.length > 0 && (
-                <Text style={styles.roomEvents}>กิจกรรม: {item.events.map(e => e.eventId).join(', ')}</Text>
-              )}
-              <Pressable style={styles.sendButton} onPress={() => sendRoom(item)}>
-                <Text style={styles.sendButtonText}>ส่งสัญญาณห้องนี้</Text>
-              </Pressable>
-              {status && (
-                <Text style={status.ok ? styles.statusOk : styles.statusErr}>{status.text}</Text>
-              )}
-            </View>
+            <RoomCard
+              schedule={item}
+              status={status}
+              onSend={() => sendRoom(item)}
+              onChangeWeekly={newWeekly => {
+                const updated = { ...item, weekly: newWeekly };
+                setSchedules(schedules.map(s => (s.room.code === item.room.code ? updated : s)));
+              }}
+            />
           );
         }}
         ListEmptyComponent={
-          !loading ? <Text style={styles.empty}>เลือกไฟล์ Excel เพื่อเริ่มต้น</Text> : undefined
+          !loading ? <Text style={styles.empty}>เลือกไฟล์ตารางเรียนแล้วกดคอมไพล์เพื่อเริ่มต้น</Text> : undefined
         }
       />
     </View>
@@ -259,16 +415,49 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#f4f5f7' },
   title: { fontSize: 22, fontWeight: '700', color: '#1c1f26' },
   subtitle: { fontSize: 13, color: '#6b7280', marginTop: 2, marginBottom: 12 },
+  importRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e4e9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  importInfo: { flex: 1, marginRight: 8 },
+  importLabel: { fontSize: 12, fontWeight: '700', color: '#1c1f26' },
+  importFileName: { fontSize: 11, color: '#6b7280', marginTop: 2 },
+  importButton: {
+    backgroundColor: '#eef2ff',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  importButtonText: { color: '#2563eb', fontWeight: '700', fontSize: 12 },
   primaryButton: {
     backgroundColor: '#2563eb',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
+    marginTop: 4,
     marginBottom: 12,
   },
+  disabledButton: { opacity: 0.5 },
   sendAllButton: { backgroundColor: '#16a34a' },
   primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   error: { color: '#dc2626', marginBottom: 12, fontSize: 13 },
+  warningBox: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  warningTitle: { fontSize: 12, fontWeight: '700', color: '#92400e', marginBottom: 4 },
+  warningText: { fontSize: 11, color: '#92400e' },
   settingsRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   settingsField: { flex: 1 },
   label: { fontSize: 11, color: '#6b7280', marginBottom: 4 },
@@ -296,7 +485,6 @@ const styles = StyleSheet.create({
   badgeSpecial: { backgroundColor: '#dbeafe' },
   badgeGeneral: { backgroundColor: '#fef3c7' },
   badgeText: { fontSize: 10, fontWeight: '700' },
-  roomMeta: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   roomWeek: { fontSize: 12, marginTop: 6 },
   roomEvents: { fontSize: 12, marginTop: 2, color: '#6b7280' },
   sendButton: {
