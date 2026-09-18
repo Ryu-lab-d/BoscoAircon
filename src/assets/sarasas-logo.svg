@@ -1,0 +1,76 @@
+<svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer shield border (dark blue) -->
+  <path d="M 100 10 L 170 50 L 170 140 Q 170 190 100 230 Q 30 190 30 140 L 30 50 Z"
+        fill="none" stroke="#1e3c72" stroke-width="8" stroke-linejoin="round"/>
+
+  <!-- Shield background (yellow) -->
+  <path d="M 100 18 L 162 54 L 162 140 Q 162 185 100 222 Q 38 185 38 140 L 38 54 Z"
+        fill="#ffd700" stroke="none"/>
+
+  <!-- Inner border (dark blue) -->
+  <path d="M 100 26 L 154 58 L 154 140 Q 154 180 100 214 Q 46 180 46 140 L 46 58 Z"
+        fill="none" stroke="#1e3c72" stroke-width="4"/>
+
+  <!-- Vertical divider -->
+  <line x1="100" y1="26" x2="100" y2="214" stroke="#1e3c72" stroke-width="3"/>
+
+  <!-- Horizontal divider -->
+  <line x1="46" y1="120" x2="154" y2="120" stroke="#1e3c72" stroke-width="3"/>
+
+  <!-- Top-left: Dove (Peace) -->
+  <g transform="translate(73, 70)">
+    <!-- Dove body -->
+    <ellipse cx="0" cy="0" rx="8" ry="10" fill="#1e3c72"/>
+    <!-- Dove head -->
+    <circle cx="0" cy="-10" r="6" fill="#1e3c72"/>
+    <!-- Dove beak -->
+    <polygon points="4,-10 10,-10 6,-8" fill="#1e3c72"/>
+    <!-- Dove wing -->
+    <path d="M -6 -2 Q -15 -8 -16 -2" stroke="#1e3c72" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Top-right: Book (Knowledge) -->
+  <g transform="translate(127, 70)">
+    <!-- Book cover -->
+    <rect x="-8" y="-10" width="16" height="20" fill="none" stroke="#1e3c72" stroke-width="2"/>
+    <!-- Book spine -->
+    <line x1="0" y1="-10" x2="0" y2="10" stroke="#1e3c72" stroke-width="2"/>
+    <!-- Book pages -->
+    <path d="M -6 -6 Q -3 -3 0 -6" stroke="#1e3c72" stroke-width="1.5" fill="none"/>
+    <path d="M -6 0 Q -3 3 0 0" stroke="#1e3c72" stroke-width="1.5" fill="none"/>
+    <path d="M -6 6 Q -3 9 0 6" stroke="#1e3c72" stroke-width="1.5" fill="none"/>
+  </g>
+
+  <!-- Bottom-left: Family (Community) -->
+  <g transform="translate(73, 170)">
+    <!-- Adult -->
+    <circle cx="-6" cy="-8" r="4" fill="#1e3c72"/>
+    <polygon points="-6,-4 -10,0 -2,0" fill="#1e3c72"/>
+    <!-- Child 1 -->
+    <circle cx="0" cy="-6" r="3" fill="#1e3c72"/>
+    <polygon points="0,-3 -3,0 3,0" fill="#1e3c72"/>
+    <!-- Child 2 -->
+    <circle cx="6" cy="-6" r="3" fill="#1e3c72"/>
+    <polygon points="6,-3 3,0 9,0" fill="#1e3c72"/>
+  </g>
+
+  <!-- Bottom-right: Flame (Spirit/Energy) -->
+  <g transform="translate(127, 170)">
+    <!-- Flame base -->
+    <ellipse cx="0" cy="5" rx="4" ry="3" fill="#1e3c72"/>
+    <!-- Flame middle -->
+    <path d="M -4 2 Q -6 -2 -2 -6 Q 0 -8 2 -6 Q 6 -2 4 2" fill="#1e3c72"/>
+    <!-- Flame sparkles -->
+    <circle cx="-6" cy="-2" r="1.5" fill="#1e3c72"/>
+    <circle cx="6" cy="-2" r="1.5" fill="#1e3c72"/>
+    <circle cx="0" cy="-10" r="1.5" fill="#1e3c72"/>
+  </g>
+
+  <!-- Cross (Christian foundation) - center -->
+  <g transform="translate(100, 120)">
+    <!-- Vertical bar -->
+    <rect x="-3" y="-30" width="6" height="60" fill="#1e3c72"/>
+    <!-- Horizontal bar -->
+    <rect x="-15" y="-8" width="30" height="6" fill="#1e3c72"/>
+  </g>
+</svg>

@@ -1,16 +1,22 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View, Image, Animated, Text } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, Image, Animated, Text, Pressable } from 'react-native';
 
 interface SplashScreenProps {
   onFinish: () => void;
 }
 
 export default function SplashScreen({ onFinish }: SplashScreenProps) {
+  const [skipClicked, setSkipClicked] = useState(false);
   const scaleAnim = React.useRef(new Animated.Value(0)).current;
   const opacityAnim = React.useRef(new Animated.Value(0)).current;
   const rotateAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (skipClicked) {
+      onFinish();
+      return;
+    }
+
     // Logo pop-in animation
     Animated.parallel([
       Animated.timing(scaleAnim, {
@@ -33,7 +39,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
     // Navigate after 3 seconds
     const timer = setTimeout(onFinish, 3000);
     return () => clearTimeout(timer);
-  }, [scaleAnim, opacityAnim, rotateAnim, onFinish]);
+  }, [scaleAnim, opacityAnim, rotateAnim, onFinish, skipClicked]);
 
   const rotate = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -46,6 +52,11 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
       <View style={[styles.circle, styles.circle1]} />
       <View style={[styles.circle, styles.circle2]} />
       <View style={[styles.circle, styles.circle3]} />
+
+      {/* Close button */}
+      <Pressable style={styles.closeButton} onPress={() => setSkipClicked(true)}>
+        <Text style={styles.closeButtonText}>✕</Text>
+      </Pressable>
 
       {/* Logo */}
       <Animated.View
@@ -61,7 +72,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
         ]}
       >
         <Image
-          source={require('../assets/sarasas-logo.png')}
+          source={require('../assets/sarasas-logo.svg')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -84,6 +95,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#1e3c72',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  closeButtonText: {
+    fontSize: 28,
+    color: '#ffffff',
+    fontWeight: '300',
   },
   logoWrapper: {
     marginBottom: 40,
