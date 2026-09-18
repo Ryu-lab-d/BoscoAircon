@@ -29,6 +29,19 @@ export class TimetableBroadcaster {
 
   constructor(private options: BroadcastOptions) {
     this.socket = dgram.createSocket({ type: 'udp4' });
+
+    // react-native-udp's setBroadcast() is fire-and-forget: on failure it
+    // emits 'error' on the socket instead of rejecting anything. Node's
+    // EventEmitter throws if an 'error' event has no listener, which was
+    // crashing the whole JS instance (visible as a RedBox + app restart)
+    // whenever setBroadcast's native call lost its race against a later
+    // close() — see the two setTimeout/close comments below. This listener
+    // must live for the socket's entire lifetime, not just until 'listening'
+    // fires, so a late error can never go unhandled.
+    this.socket.on('error', () => {
+      /* swallowed: surfaced instead via the per-room error results below */
+    });
+
     this.bound = new Promise((resolve, reject) => {
       const onError = (err: Error) => {
         this.socket.removeListener('listening', onListening);
@@ -36,8 +49,15 @@ export class TimetableBroadcaster {
       };
       const onListening = () => {
         this.socket.removeListener('error', onError);
+        // react-native-udp's native receive loop blocks on socket.receive()
+        // with no timeout, and the JVM synchronizes DatagramSocket methods on
+        // the same object monitor — so setBroadcast() can sit queued behind
+        // it for several seconds on a quiet network. It's fire-and-forget
+        // (no callback/promise in this library's JS API), so give it a beat
+        // to actually land natively before we start sending, rather than
+        // resolving immediately and racing a later close() against it.
         this.socket.setBroadcast(true);
-        resolve();
+        setTimeout(resolve, 250);
       };
       this.socket.once('error', onError);
       this.socket.once('listening', onListening);
