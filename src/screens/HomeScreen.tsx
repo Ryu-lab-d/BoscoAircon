@@ -266,9 +266,13 @@ export default function HomeScreen() {
   const listHeader = useMemo(
     () => (
       <View>
-        <Text style={styles.title}>BoscoAircon</Text>
-        <Text style={styles.subtitle}>นำเข้าตารางเรียนจริงแล้วคอมไพล์เป็นตารางเปิด-ปิดแอร์รายห้อง</Text>
+        <View style={styles.hero}>
+          <Text style={styles.heroEyebrow}>SARASAS EKTRA SCHOOL</Text>
+          <Text style={styles.title}>BoscoAircon</Text>
+          <Text style={styles.subtitle}>นำเข้าตารางเรียนจริงแล้วคอมไพล์เป็นตารางเปิด-ปิดแอร์รายห้อง</Text>
+        </View>
 
+        <Text style={styles.sectionLabel}>นำเข้าไฟล์</Text>
         <ImportRow
           label="ตารางเรียน (Timetable)"
           required
@@ -331,6 +335,7 @@ export default function HomeScreen() {
           </View>
         )}
 
+        <Text style={styles.sectionLabel}>ตั้งค่าเครือข่าย</Text>
         <View style={styles.settingsRow}>
           <View style={styles.settingsField}>
             <Text style={styles.label}>พอร์ต UDP</Text>
@@ -351,6 +356,8 @@ export default function HomeScreen() {
             )}
           </Pressable>
         )}
+
+        {schedules.length > 0 && <Text style={styles.sectionLabel}>รายการห้อง ({schedules.length})</Text>}
       </View>
     ),
     [
@@ -386,21 +393,24 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <FlatList
         style={styles.list}
+        contentContainerStyle={styles.listContent}
         data={schedules}
         keyExtractor={item => item.room.code}
         ListHeaderComponent={listHeader}
         renderItem={({ item }) => {
           const status = roomStatus[item.room.code];
           return (
-            <RoomCard
-              schedule={item}
-              status={status}
-              onSend={() => sendRoom(item)}
-              onChangeWeekly={newWeekly => {
-                const updated = { ...item, weekly: newWeekly };
-                setSchedules(schedules.map(s => (s.room.code === item.room.code ? updated : s)));
-              }}
-            />
+            <View style={styles.roomCardWrapper}>
+              <RoomCard
+                schedule={item}
+                status={status}
+                onSend={() => sendRoom(item)}
+                onChangeWeekly={newWeekly => {
+                  const updated = { ...item, weekly: newWeekly };
+                  setSchedules(schedules.map(s => (s.room.code === item.room.code ? updated : s)));
+                }}
+              />
+            </View>
           );
         }}
         ListEmptyComponent={
@@ -411,91 +421,108 @@ export default function HomeScreen() {
   );
 }
 
+const NAVY = '#1e3c72';
+const GOLD = '#ffd700';
+
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#f4f5f7' },
-  title: { fontSize: 22, fontWeight: '700', color: '#1c1f26' },
-  subtitle: { fontSize: 13, color: '#6b7280', marginTop: 2, marginBottom: 12 },
+  container: { flex: 1, backgroundColor: '#f4f5f9' },
+  hero: {
+    backgroundColor: NAVY,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 28,
+    marginBottom: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  heroEyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: GOLD,
+    letterSpacing: 1.5,
+    marginBottom: 6,
+  },
+  title: { fontSize: 26, fontWeight: '800', color: '#ffffff' },
+  subtitle: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 6, lineHeight: 18 },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: NAVY,
+    letterSpacing: 0.5,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
   importRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e2e4e9',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 8,
+    marginHorizontal: 16,
+    shadowColor: '#1c1f26',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   importInfo: { flex: 1, marginRight: 8 },
-  importLabel: { fontSize: 12, fontWeight: '700', color: '#1c1f26' },
-  importFileName: { fontSize: 11, color: '#6b7280', marginTop: 2 },
+  importLabel: { fontSize: 13, fontWeight: '700', color: '#1c1f26' },
+  importFileName: { fontSize: 11, color: '#8b93a1', marginTop: 2 },
   importButton: {
     backgroundColor: '#eef2ff',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  importButtonText: { color: '#2563eb', fontWeight: '700', fontSize: 12 },
-  primaryButton: {
-    backgroundColor: '#2563eb',
     borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  disabledButton: { opacity: 0.5 },
-  sendAllButton: { backgroundColor: '#16a34a' },
-  primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  error: { color: '#dc2626', marginBottom: 12, fontSize: 13 },
+  importButtonText: { color: NAVY, fontWeight: '700', fontSize: 12 },
+  primaryButton: {
+    backgroundColor: NAVY,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+    marginHorizontal: 16,
+    shadowColor: NAVY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  disabledButton: { opacity: 0.4, shadowOpacity: 0 },
+  sendAllButton: { backgroundColor: '#166534', shadowColor: '#166534' },
+  primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 14, letterSpacing: 0.3 },
+  error: { color: '#dc2626', marginBottom: 12, marginHorizontal: 16, fontSize: 13 },
   warningBox: {
     backgroundColor: '#fffbeb',
     borderWidth: 1,
     borderColor: '#fde68a',
-    borderRadius: 8,
-    padding: 10,
+    borderRadius: 10,
+    padding: 12,
     marginBottom: 12,
+    marginHorizontal: 16,
   },
   warningTitle: { fontSize: 12, fontWeight: '700', color: '#92400e', marginBottom: 4 },
   warningText: { fontSize: 11, color: '#92400e' },
-  settingsRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  settingsRow: { flexDirection: 'row', gap: 12, marginBottom: 8, marginHorizontal: 16 },
   settingsField: { flex: 1 },
-  label: { fontSize: 11, color: '#6b7280', marginBottom: 4 },
+  label: { fontSize: 11, color: '#8b93a1', marginBottom: 4, fontWeight: '600' },
   input: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#e2e4e9',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     fontSize: 13,
     backgroundColor: '#fff',
+    color: '#1c1f26',
   },
   list: { flex: 1 },
-  roomCard: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e2e4e9',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
-  },
-  roomHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  roomCode: { fontSize: 16, fontWeight: '700' },
-  badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeSpecial: { backgroundColor: '#dbeafe' },
-  badgeGeneral: { backgroundColor: '#fef3c7' },
-  badgeText: { fontSize: 10, fontWeight: '700' },
-  roomWeek: { fontSize: 12, marginTop: 6 },
-  roomEvents: { fontSize: 12, marginTop: 2, color: '#6b7280' },
-  sendButton: {
-    marginTop: 10,
-    backgroundColor: '#2563eb',
-    borderRadius: 6,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  sendButtonText: { color: '#fff', fontWeight: '600', fontSize: 12 },
-  statusOk: { color: '#16a34a', fontSize: 12, marginTop: 6 },
-  statusErr: { color: '#dc2626', fontSize: 12, marginTop: 6 },
-  empty: { textAlign: 'center', color: '#6b7280', marginTop: 40 },
+  listContent: { paddingBottom: 24 },
+  roomCardWrapper: { marginHorizontal: 16, marginBottom: 10 },
+  empty: { textAlign: 'center', color: '#8b93a1', marginTop: 40, marginHorizontal: 16, fontSize: 13 },
 });

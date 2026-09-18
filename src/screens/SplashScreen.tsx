@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Image, Animated, Text, Pressable } from 'react-native';
+import { StyleSheet, View, Animated, Text, Pressable } from 'react-native';
+import Svg, { Path, Line, G, Circle, Polygon, Ellipse, Rect } from 'react-native-svg';
 
 interface SplashScreenProps {
   onFinish: () => void;
@@ -71,9 +72,61 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           },
         ]}
       >
-        <View style={styles.logo}>
-          <Text style={styles.logoText}>🛡️</Text>
-        </View>
+        <Svg width={150} height={180} viewBox="0 0 200 240">
+          {/* Outer shield border */}
+          <Path d="M 100 10 L 170 50 L 170 140 Q 170 190 100 230 Q 30 190 30 140 L 30 50 Z"
+            fill="none" stroke="#1e3c72" strokeWidth="8" strokeLinejoin="round"/>
+
+          {/* Shield background */}
+          <Path d="M 100 18 L 162 54 L 162 140 Q 162 185 100 222 Q 38 185 38 140 L 38 54 Z"
+            fill="#ffd700" stroke="none"/>
+
+          {/* Inner border */}
+          <Path d="M 100 26 L 154 58 L 154 140 Q 154 180 100 214 Q 46 180 46 140 L 46 58 Z"
+            fill="none" stroke="#1e3c72" strokeWidth="4"/>
+
+          {/* Dividers */}
+          <Line x1="100" y1="26" x2="100" y2="214" stroke="#1e3c72" strokeWidth="3"/>
+          <Line x1="46" y1="120" x2="154" y2="120" stroke="#1e3c72" strokeWidth="3"/>
+
+          {/* Top-left: Dove */}
+          <G transform="translate(73, 70)">
+            <Ellipse cx="0" cy="0" rx="8" ry="10" fill="#1e3c72"/>
+            <Circle cx="0" cy="-10" r="6" fill="#1e3c72"/>
+            <Polygon points="4,-10 10,-10 6,-8" fill="#1e3c72"/>
+          </G>
+
+          {/* Top-right: Book */}
+          <G transform="translate(127, 70)">
+            <Rect x="-8" y="-10" width="16" height="20" fill="none" stroke="#1e3c72" strokeWidth="2"/>
+            <Line x1="0" y1="-10" x2="0" y2="10" stroke="#1e3c72" strokeWidth="2"/>
+          </G>
+
+          {/* Bottom-left: Family */}
+          <G transform="translate(73, 170)">
+            <Circle cx="-6" cy="-8" r="4" fill="#1e3c72"/>
+            <Polygon points="-6,-4 -10,0 -2,0" fill="#1e3c72"/>
+            <Circle cx="0" cy="-6" r="3" fill="#1e3c72"/>
+            <Polygon points="0,-3 -3,0 3,0" fill="#1e3c72"/>
+            <Circle cx="6" cy="-6" r="3" fill="#1e3c72"/>
+            <Polygon points="6,-3 3,0 9,0" fill="#1e3c72"/>
+          </G>
+
+          {/* Bottom-right: Flame */}
+          <G transform="translate(127, 170)">
+            <Ellipse cx="0" cy="5" rx="4" ry="3" fill="#1e3c72"/>
+            <Path d="M -4 2 Q -6 -2 -2 -6 Q 0 -8 2 -6 Q 6 -2 4 2" fill="#1e3c72"/>
+            <Circle cx="-6" cy="-2" r="1.5" fill="#1e3c72"/>
+            <Circle cx="6" cy="-2" r="1.5" fill="#1e3c72"/>
+            <Circle cx="0" cy="-10" r="1.5" fill="#1e3c72"/>
+          </G>
+
+          {/* Center Cross */}
+          <G transform="translate(100, 120)">
+            <Rect x="-3" y="-30" width="6" height="60" fill="#1e3c72"/>
+            <Rect x="-15" y="-8" width="30" height="6" fill="#1e3c72"/>
+          </G>
+        </Svg>
       </Animated.View>
 
       {/* Text */}
@@ -113,15 +166,6 @@ const styles = StyleSheet.create({
   },
   logoWrapper: {
     marginBottom: 40,
-  },
-  logo: {
-    width: 150,
-    height: 150,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoText: {
-    fontSize: 80,
   },
   title1: {
     fontSize: 28,
